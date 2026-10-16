@@ -1,1 +1,1 @@
-Implementation of the originial Flash Attention algorithm in CUDA. Scaffolding based on minimal-flash-attention.
+Implementation of [the originial Flash Attention algorithm](https://arxiv.org/abs/2205.14135) in CUDA. The core CUDA kernel is an efficient implementation of the original paper. Scaffolding is based on [flash-attention-minimal](https://github.com/tspeterkim/flash-attention-minimal), with major modifications. 
