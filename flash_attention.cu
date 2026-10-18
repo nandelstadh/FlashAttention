@@ -2,11 +2,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
-#include "flash.h"
+#include "flash.cuh"
 
 __global__ void flash_attention(const float* Q, const float* K, const float* V, float* l, float* m, float* O, const int N, const int d, const int tc, const int tr, const int bc, const int br, const float softmax_scale){
 	int tx = threadIdx.x;
-	int batch = blockIdx.x; int head = blockIdx.y;
+	int batch = blockIdx.x; int head = blockIdx.y; 
 
 	// Computing offsets
 	int matrix_offset = gridDim.y*batch*N*d + head*N*d;
@@ -35,7 +35,7 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 		int KV_valid = min(bc, N - j*bc);
 
 		// Loop over T_r
-		for (int i=0; i < tr; i++){
+		for (int i=blockIdx.z; i < tr; i+=gridDim.z){
 			int Q_row = i*br + tx;
 			if (Q_row < N){
 				// Load Q_i into shared memory, l and m into registers
@@ -79,13 +79,18 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 			float row_l_new = (__expf(row_max_prev - row_max_new)*row_l_prev) + (__expf(row_max - row_max_new)*row_l);
 
 			// Write to device memory
+			//We first precompute some things outside loop
+			float inv_l = 1.f/row_l_new;
+			float a = row_l_prev*__expf(row_max_prev - row_max_new)*inv_l;
+			float b = __expf(row_max - row_max_new)*inv_l;
+
 			for (int x=0; x<d; x++){
 				float temp = 0;
 				for (int y=0; y<bc; y++){
 					temp += S_ij[(bc*tx) + y]*V_j[(y*d) + x];
 				}
 				int idx = matrix_offset + (Q_tile_size*i) + (tx*d) + x;
-				O[idx] = (1/row_l_new)*((row_l_prev*__expf(row_max_prev - row_max_new)*O[idx]) + __expf(row_max - row_max_new)*temp);
+				O[idx] = a*O[idx] + b*temp;
 			}
 
 			m[vector_offset + (br*i) + tx] = row_max_new;
@@ -97,10 +102,11 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 	}
 }
 
-torch::Tensor forward_pass(torch::Tensor Q, torch::Tensor K, torch::Tensor V){
+torch::Tensor forward_pass(torch::Tensor Q, torch::Tensor K, torch::Tensor V, int num_splits){
 	const int B = Q.size(0), nh = Q.size(1), N = Q.size(2), d = Q.size(3);
     int M;
     cudaDeviceGetAttribute(&M, cudaDevAttrMaxSharedMemoryPerBlock, 0);
+
 	M = M/sizeof(float);
     const int bc = M/(4 * d); // Floor not ceil
     const int br = std::min(bc, d);
@@ -113,8 +119,18 @@ torch::Tensor forward_pass(torch::Tensor Q, torch::Tensor K, torch::Tensor V){
     const int tr = ceil((float)N / (float)br);
     const int tc = ceil((float)N / (float)bc);
     const int sram_size = (br * d + 2 * bc * d + br * bc) * sizeof(float);  // The sizes of Q_i, K_j, V_j, S_ij
+																
+	if (num_splits <= 0){
+		int num_sms, blocks_per_sm;
+		cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, 0);
+		cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks_per_sm, flash_attention, br, sram_size);
 
-    dim3 grid_dim(B, nh);
+		const int target_blocks = num_sms * blocks_per_sm;   // one full wave
+		num_splits = (target_blocks + B * nh - 1) / (B * nh);
+	}
+	num_splits = std::max(1, std::min(num_splits, tr));
+
+    dim3 grid_dim(B, nh, num_splits);
     dim3 block_dim(br);
 
     flash_attention<<<grid_dim, block_dim, sram_size>>>(

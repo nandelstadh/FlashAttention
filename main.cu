@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <torch/torch.h>
-#include "flash.h"
+#include "flash.cuh"
 
 // Parsing the tensor dimensions
 static int parse_positive_int(const char* s, const char* name) {
@@ -41,5 +41,8 @@ int main(int argc, char** argv) {
 
 	auto manual_result = manual_attn(Q, K, V);
 	auto fa_result = forward_pass(Q, K, V);
-	return torch::allclose(fa_result, manual_result, 1e-3, 1e-3);
+	bool ok = torch::allclose(fa_result, manual_result, 1e-3, 1e-3);
+	std::printf("max abs diff: %g -> %s\n",
+				(fa_result - manual_result).abs().max().item<float>(), ok ? "PASS" : "FAIL");
+	return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }
