@@ -1,1 +1,5 @@
 *.pdf
+build/
+results/*
+!results/.gitkeep
+slurm/*

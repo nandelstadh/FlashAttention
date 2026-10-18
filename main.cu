@@ -4,9 +4,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
+#include <sys/resource.h>
+#include <c10/cuda/CUDACachingAllocator.h>
 #include <torch/torch.h>
 #include "flash.cuh"
+
+namespace alloc = c10::cuda::CUDACachingAllocator;
 
 enum class Mode { CPU, Unfused, FA, Test };
 
@@ -56,11 +61,22 @@ constexpr int MAX_ITERS = 100;
 // Returns average ms per call; iters is set to the number of timed calls
 template <typename F>
 static double time_ms(F&& fn, bool cuda, int& iters) {
-    auto run = [&](int n) {
-        if (cuda) cudaDeviceSynchronize();
+    auto run = [&](int n) -> double {
+        if (cuda) {
+            // Events time the default stream, which libtorch and forward_pass launch on
+            cudaEvent_t start, stop;
+            cudaEventCreate(&start); cudaEventCreate(&stop);
+            cudaEventRecord(start);
+            for (int it = 0; it < n; it++) fn();
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            float ms;
+            cudaEventElapsedTime(&ms, start, stop);
+            cudaEventDestroy(start); cudaEventDestroy(stop);
+            return ms;
+        }
         auto t0 = std::chrono::steady_clock::now();
         for (int it = 0; it < n; it++) fn();
-        if (cuda) cudaDeviceSynchronize(); // GPU launches are async
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     };
     run(1);                 // Warm-up (cuBLAS init, allocator, caches)
@@ -68,6 +84,23 @@ static double time_ms(F&& fn, bool cuda, int& iters) {
     iters = (int)std::clamp(TIME_BUDGET_MS / single, 1.0, (double)MAX_ITERS);
     if (iters == 1) return single; // Slow run: the calibration run is the measurement
     return run(iters) / iters;
+}
+
+constexpr double MIB = 1024.0 * 1024.0;
+
+// Runs fn once, reporting device memory held before the call and the peak during it.
+// This is also the only call profiled by ncu --profile-from-start off
+template <typename F>
+static void measure_gpu_call(F&& fn, double& inputs_mib, double& peak_mib) {
+    cudaDeviceSynchronize();
+    alloc::resetPeakStats(0);
+    // Index 0 is the aggregate over all pools
+    inputs_mib = alloc::getDeviceStats(0).allocated_bytes[0].current / MIB;
+    cudaProfilerStart();
+    fn();
+    cudaDeviceSynchronize();
+    cudaProfilerStop();
+    peak_mib = alloc::getDeviceStats(0).allocated_bytes[0].peak / MIB;
 }
 
 int main(int argc, char** argv) {
@@ -94,13 +127,28 @@ int main(int argc, char** argv) {
 		return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
 
-	int iters;
-	double ms = (mode == Mode::FA)
-		? time_ms([&]{ forward_pass(Q, K, V); }, cuda, iters)
-		: time_ms([&]{ unfused_attn(Q, K, V); }, cuda, iters);
+	auto fa = [&]{ forward_pass(Q, K, V); };
+	auto unfused = [&]{ unfused_attn(Q, K, V); };
 
-	const double flops = 4.0 * B * nh * (double)N * N * d; // The two matmuls
-	std::printf("%s: %.3f ms/iter over %d iters, %.1f GFLOP/s\n",
-				argv[1], ms, iters, flops / (ms * 1e6));
+	int iters;
+	double ms = (mode == Mode::FA) ? time_ms(fa, cuda, iters) : time_ms(unfused, cuda, iters);
+	const double gflops = 4.0 * B * nh * (double)N * N * d / (ms * 1e6); // The two matmuls
+
+	// One CSV row; the SLURM scripts own the header
+	if (cuda){
+		double inputs_mib, peak_mib;
+		if (mode == Mode::FA) measure_gpu_call(fa, inputs_mib, peak_mib);
+		else measure_gpu_call(unfused, inputs_mib, peak_mib);
+		// iters,ms,gflops,inputs_mib,peak_mib,extra_mib
+		std::printf("%d,%.4f,%.1f,%.1f,%.1f,%.1f\n",
+					iters, ms, gflops, inputs_mib, peak_mib, peak_mib - inputs_mib);
+	}
+	else{
+		// Process-wide peak RSS (KiB on Linux); one configuration per process makes it this run's peak
+		struct rusage ru;
+		getrusage(RUSAGE_SELF, &ru);
+		// iters,ms,gflops,peak_rss_mib
+		std::printf("%d,%.4f,%.1f,%.1f\n", iters, ms, gflops, ru.ru_maxrss / 1024.0);
+	}
 	return EXIT_SUCCESS;
 }
