@@ -40,7 +40,7 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 			if (Q_row < N){
 				// Load Q_i into shared memory, l and m into registers
 				for (int x = 0; x < d; x++){
-					Q_i[(tx*d) + x] = Q[matrix_offset + (Q_tile_size*i) + (tx*d) + x];
+					Q_i[x*br + tx] = Q[matrix_offset + (Q_tile_size*i) + (tx*d) + x];
 				}
 				
 				float row_max_prev = m[vector_offset + br*i + tx];
@@ -52,7 +52,7 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 				float temp = 0.0f;
 				if (y < KV_valid){
 					for (int x = 0; x < d; x++){
-						temp += Q_i[(tx*d) + x]*K_j[(y*d) + x];
+						temp += Q_i[x*br + tx]*K_j[(y*d) + x];
 					}
 				temp *= softmax_scale;
 				}
@@ -60,7 +60,7 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 					temp = -INFINITY;
 				}
 
-				S_ij[(bc*tx) + y] = temp;
+				S_ij[(y*br) + tx] = temp;
 
 				if (temp > row_max)
 					row_max = temp;
@@ -70,8 +70,8 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 			// Compute P and row_l
 			float row_l = 0;
 			for (int y=0; y < bc; y++){
-				S_ij[(bc*tx) + y] = __expf(S_ij[(bc*tx) + y] - row_max);
-				row_l += S_ij[(bc*tx) + y];
+				S_ij[(y*br) + tx] = __expf(S_ij[(y*br) + tx] - row_max);
+				row_l += S_ij[(y*br) + tx];
 			}
 
 			// Compute new m and l
@@ -87,7 +87,7 @@ __global__ void flash_attention(const float* Q, const float* K, const float* V, 
 			for (int x=0; x<d; x++){
 				float temp = 0;
 				for (int y=0; y<bc; y++){
-					temp += S_ij[(bc*tx) + y]*V_j[(y*d) + x];
+					temp += S_ij[(y*br) + tx]*V_j[(y*d) + x];
 				}
 				int idx = matrix_offset + (Q_tile_size*i) + (tx*d) + x;
 				O[idx] = a*O[idx] + b*temp;
