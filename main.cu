@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
 	if (mode == Mode::Test){
 		auto manual_result = unfused_attn(Q, K, V);
 		auto fa_result = forward_pass(Q, K, V);
-		// TF32 tensor cores keep a 10-bit mantissa, so allow ~1e-3 level error
+		// FP16 tensor-core inputs keep a 10-bit mantissa, so allow ~1e-3 level error
 		bool ok = torch::allclose(fa_result, manual_result, 5e-3, 5e-3);
 		std::printf("max abs diff: %g -> %s\n",
 					(fa_result - manual_result).abs().max().item<float>(), ok ? "PASS" : "FAIL");

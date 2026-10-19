@@ -2,7 +2,7 @@ Implementation of [the originial Flash Attention algorithm](https://arxiv.org/ab
 
 ## Building and running on UPPMAX Pelle
 
-The kernel uses TF32 tensor cores and is built for the H100 (sm_90). It links against the prebuilt libtorch C++ distribution; nothing besides this project needs to be compiled.
+The kernel uses FP16 tensor cores (float accumulation) and is built for the L40s (sm_89). It links against the prebuilt libtorch C++ distribution; nothing besides this project needs to be compiled.
 
 One-time setup on a login node:
 
@@ -14,8 +14,10 @@ unzip -q libtorch-shared-with-deps-2.14.1+cu132.zip   # creates ~/libtorch
 rm libtorch-shared-with-deps-2.14.1+cu132.zip
 
 cd <this repo>
-source slurm/common.sh   # loads the modules and builds build/main
+bash slurm/common.sh     # loads the modules and builds build/main
 ```
+
+libtorch must be unpacked before building. Run `common.sh` with `bash`, not `source`: it sets `set -euo pipefail`, which in an interactive shell would close the session on the first error.
 
 To keep libtorch elsewhere, `export LIBTORCH=/path/to/libtorch` before building or submitting.
 

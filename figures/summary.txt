@@ -1,0 +1,69 @@
+Data (best of runs per configuration)
+  fa       1 run(s): results/fa_7217615.csv
+  unfused  1 run(s): results/unfused_7217711.csv
+  cpu      2 run(s): results/cpu_7218176.csv, results/cpu_7218535.csv; largest run-to-run spread 3293 %
+
+Time per forward pass at the largest N that ran [ms, GFLOP/s]
+   1 head(s) d =  64 fa       N = 16384:      9.41 ms,   7303.6 GFLOP/s
+   1 head(s) d = 128 fa       N = 16384:     20.06 ms,   6850.3 GFLOP/s
+   1 head(s) d =  64 unfused  N = 16384:      9.91 ms,   6932.8 GFLOP/s
+   1 head(s) d = 128 unfused  N = 16384:     10.77 ms,  12763.1 GFLOP/s
+   1 head(s) d =  64 cpu      N = 16384:    393.20 ms,    174.8 GFLOP/s
+   1 head(s) d = 128 cpu      N = 16384:    590.02 ms,    232.9 GFLOP/s
+  32 head(s) d =  64 fa       N = 16384:    307.41 ms,   7153.4 GFLOP/s
+  32 head(s) d = 128 fa       N = 16384:    783.03 ms,   5616.7 GFLOP/s
+  32 head(s) d =  64 unfused  N =  8192:     78.36 ms,   7015.5 GFLOP/s
+  32 head(s) d = 128 unfused  N =  8192:     84.66 ms,  12988.0 GFLOP/s
+  32 head(s) d =  64 cpu      N =  8192:   2620.70 ms,    209.8 GFLOP/s
+  32 head(s) d = 128 cpu      N =  8192:   3718.83 ms,    295.7 GFLOP/s
+
+Speedup of the FA kernel (time of other / time of FA)
+   1 head(s) d =  64 vs unfused :    0.07x ..    1.05x, at N = 16384: 1.05x
+   1 head(s) d = 128 vs unfused :    0.05x ..    0.54x, at N = 16384: 0.54x
+   1 head(s) d =  64 vs cpu     :    4.61x ..   41.79x, at N = 16384: 41.79x
+   1 head(s) d = 128 vs cpu     :    3.40x ..   29.41x, at N = 16384: 29.41x
+  32 head(s) d =  64 vs unfused :    0.98x ..    1.25x, at N = 8192: 0.98x
+  32 head(s) d = 128 vs unfused :    0.42x ..    0.44x, at N = 8192: 0.43x
+  32 head(s) d =  64 vs cpu     :   32.13x ..   37.92x, at N = 8192: 32.67x
+  32 head(s) d = 128 vs cpu     :   17.61x ..   18.86x, at N = 8192: 18.71x
+
+Memory beyond the inputs [MiB]: measured vs model
+   1 head(s) d =  64 fa       N = 16384:       4.1 MiB
+   1 head(s) d =  64 unfused  N = 16384:    2048.0 MiB
+   1 head(s) d = 128 fa       N = 16384:       8.1 MiB
+   1 head(s) d = 128 unfused  N = 16384:    2048.0 MiB
+  32 head(s) d =  64 fa       N = 16384:     132.0 MiB
+  32 head(s) d =  64 unfused  N =  8192:   16384.0 MiB
+  32 head(s) d = 128 fa       N = 16384:     260.0 MiB
+  32 head(s) d = 128 unfused  N =  8192:   16384.0 MiB
+
+DRAM traffic: measured / model (FA model uses bc = 64, L2 = 96 MB)
+   1 head(s) d =  64 fa       N = 1024..16384: 1.91 1.43 1.43 1.31 1.37
+   1 head(s) d =  64 unfused  N = 1024..16384: 0.65 0.60 0.69 1.04 1.15
+   1 head(s) d = 128 fa       N = 1024..16384: 1.43 1.43 1.43 1.37 1.37
+   1 head(s) d = 128 unfused  N = 1024..16384: 0.66 0.60 0.71 1.05 1.15
+  32 head(s) d =  64 fa       N = 1024..16384: 1.37 1.37 1.44 1.32 1.35
+  32 head(s) d =  64 unfused  N = 1024..8192: 0.90 1.11 1.14 1.15
+  32 head(s) d = 128 fa       N = 1024..16384: 1.37 1.73 1.17 1.22 1.23
+  32 head(s) d = 128 unfused  N = 1024..8192: 0.91 1.12 1.14 1.15
+
+Roofline: ridge points fp32 106 flop/B, fp16 tensor 419 flop/B
+  (AI = 4·B·nh·N²·d / measured DRAM bytes; % of the attainable roof of that implementation)
+  model AI: FA bc/3 = 21.3 flop/B, unfused d/6 = 10.7 (d = 64), 21.3 (d = 128) flop/B
+  fa       32 head(s) d =  64 N =  8192: AI    16.1 flop/B,   6852.8 GFLOP/s =  49.4 % of roof
+  fa       32 head(s) d =  64 N = 16384: AI    15.7 flop/B,   7153.4 GFLOP/s =  52.6 % of roof
+  fa       32 head(s) d = 128 N =  4096: AI    18.1 flop/B,   5406.9 GFLOP/s =  34.6 % of roof
+  fa       32 head(s) d = 128 N =  8192: AI    17.4 flop/B,   5533.1 GFLOP/s =  36.8 % of roof
+  fa       32 head(s) d = 128 N = 16384: AI    17.4 flop/B,   5616.7 GFLOP/s =  37.4 % of roof
+  unfused   1 head(s) d =  64 N =  8192: AI    10.2 flop/B,   6727.8 GFLOP/s =  76.6 % of roof
+  unfused   1 head(s) d =  64 N = 16384: AI     9.3 flop/B,   6932.8 GFLOP/s =  86.5 % of roof
+  unfused   1 head(s) d = 128 N =  8192: AI    20.1 flop/B,  12550.7 GFLOP/s =  72.3 % of roof
+  unfused   1 head(s) d = 128 N = 16384: AI    18.5 flop/B,  12763.1 GFLOP/s =  79.8 % of roof
+  unfused  32 head(s) d =  64 N =  1024: AI    11.3 flop/B,   6539.7 GFLOP/s =  66.9 % of roof
+  unfused  32 head(s) d =  64 N =  2048: AI     9.4 flop/B,   6528.4 GFLOP/s =  80.6 % of roof
+  unfused  32 head(s) d =  64 N =  4096: AI     9.2 flop/B,   6838.4 GFLOP/s =  85.6 % of roof
+  unfused  32 head(s) d =  64 N =  8192: AI     9.2 flop/B,   7015.5 GFLOP/s =  88.1 % of roof
+  unfused  32 head(s) d = 128 N =  1024: AI    21.5 flop/B,  11963.4 GFLOP/s =  64.3 % of roof
+  unfused  32 head(s) d = 128 N =  2048: AI    18.3 flop/B,  12343.5 GFLOP/s =  78.1 % of roof
+  unfused  32 head(s) d = 128 N =  4096: AI    18.3 flop/B,  12799.6 GFLOP/s =  81.1 % of roof
+  unfused  32 head(s) d = 128 N =  8192: AI    18.3 flop/B,  12988.0 GFLOP/s =  82.1 % of roof
