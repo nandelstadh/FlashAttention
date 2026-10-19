@@ -2,4 +2,3 @@
 build/
 results/*
 !results/.gitkeep
-slurm/*
