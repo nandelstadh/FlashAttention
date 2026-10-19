@@ -405,7 +405,8 @@ def plot_roofline(best):
                 continue
             ax.plot(xs, ys, ls="none", marker=MARKER[impl], ms=8, color=COLOR[impl],
                     mfc="none" if resident else COLOR[impl], mew=1.6, zorder=3,
-                    label=f"{LABEL[impl]}, " + ("working set in L2 (AI inflated)" if resident
+                    label=f"{LABEL[impl]}, " + ("only compulsory traffic" if impl == "fa"
+                                                else "working set in L2 (AI inflated)" if resident
                                                 else "working set larger than L2"))
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -416,7 +417,7 @@ def plot_roofline(best):
     ax.set_title("L40s roofline: 864 GB/s, 91.6 TFLOP/s fp32, 362 TFLOP/s fp16 tensor", fontsize=11)
     ax.grid(True, which="major", alpha=0.35)
     ax.grid(True, which="minor", alpha=0.12)
-    ax.legend(fontsize=8, framealpha=0.95, loc="lower right")
+    ax.legend(fontsize=8, framealpha=0.95, loc="upper left")
     save(fig, "roofline.png")
 
 

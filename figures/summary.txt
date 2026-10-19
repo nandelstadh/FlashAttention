@@ -1,60 +1,97 @@
 Data (best of runs per configuration)
-  fa       1 run(s): results/fa_7217615.csv
+  fa       1 run(s): results/fa_2.csv
   unfused  1 run(s): results/unfused_7217711.csv
   cpu      2 run(s): results/cpu_7218176.csv, results/cpu_7218535.csv; largest run-to-run spread 3293 %
+  fa1      1 run(s): results/fa1_7217615.csv
 
 Time per forward pass at the largest N that ran [ms, GFLOP/s]
-   1 head(s) d =  64 fa       N = 16384:      9.41 ms,   7303.6 GFLOP/s
-   1 head(s) d = 128 fa       N = 16384:     20.06 ms,   6850.3 GFLOP/s
+   1 head(s) d =  64 fa       N = 16384:      3.61 ms,  19053.4 GFLOP/s
+   1 head(s) d = 128 fa       N = 16384:     11.45 ms,  12006.8 GFLOP/s
    1 head(s) d =  64 unfused  N = 16384:      9.91 ms,   6932.8 GFLOP/s
    1 head(s) d = 128 unfused  N = 16384:     10.77 ms,  12763.1 GFLOP/s
    1 head(s) d =  64 cpu      N = 16384:    393.20 ms,    174.8 GFLOP/s
    1 head(s) d = 128 cpu      N = 16384:    590.02 ms,    232.9 GFLOP/s
-  32 head(s) d =  64 fa       N = 16384:    307.41 ms,   7153.4 GFLOP/s
-  32 head(s) d = 128 fa       N = 16384:    783.03 ms,   5616.7 GFLOP/s
+   1 head(s) d =  64 fa1      N = 16384:      9.41 ms,   7303.6 GFLOP/s
+   1 head(s) d = 128 fa1      N = 16384:     20.06 ms,   6850.3 GFLOP/s
+  32 head(s) d =  64 fa       N = 16384:    106.56 ms,  20636.9 GFLOP/s
+  32 head(s) d = 128 fa       N = 16384:    343.42 ms,  12806.7 GFLOP/s
   32 head(s) d =  64 unfused  N =  8192:     78.36 ms,   7015.5 GFLOP/s
   32 head(s) d = 128 unfused  N =  8192:     84.66 ms,  12988.0 GFLOP/s
   32 head(s) d =  64 cpu      N =  8192:   2620.70 ms,    209.8 GFLOP/s
   32 head(s) d = 128 cpu      N =  8192:   3718.83 ms,    295.7 GFLOP/s
+  32 head(s) d =  64 fa1      N = 16384:    307.41 ms,   7153.4 GFLOP/s
+  32 head(s) d = 128 fa1      N = 16384:    783.03 ms,   5616.7 GFLOP/s
 
-Speedup of the FA kernel (time of other / time of FA)
-   1 head(s) d =  64 vs unfused :    0.07x ..    1.05x, at N = 16384: 1.05x
-   1 head(s) d = 128 vs unfused :    0.05x ..    0.54x, at N = 16384: 0.54x
-   1 head(s) d =  64 vs cpu     :    4.61x ..   41.79x, at N = 16384: 41.79x
-   1 head(s) d = 128 vs cpu     :    3.40x ..   29.41x, at N = 16384: 29.41x
-  32 head(s) d =  64 vs unfused :    0.98x ..    1.25x, at N = 8192: 0.98x
-  32 head(s) d = 128 vs unfused :    0.42x ..    0.44x, at N = 8192: 0.43x
-  32 head(s) d =  64 vs cpu     :   32.13x ..   37.92x, at N = 8192: 32.67x
-  32 head(s) d = 128 vs cpu     :   17.61x ..   18.86x, at N = 8192: 18.71x
+Speedup of FA kernel, GPU (fp16 tensor cores) (time of other / time of FA)
+   1 head(s) d =  64 vs fa1     :    1.71x ..    2.61x, at N = 16384: 2.61x
+   1 head(s) d = 128 vs fa1     :    1.75x ..    2.19x, at N = 16384: 1.75x
+   1 head(s) d =  64 vs unfused :    0.12x ..    2.75x, at N = 16384: 2.75x
+   1 head(s) d = 128 vs unfused :    0.09x ..    0.94x, at N = 16384: 0.94x
+   1 head(s) d =  64 vs cpu     :    7.90x ..  109.02x, at N = 16384: 109.02x
+   1 head(s) d = 128 vs cpu     :    6.67x ..   51.54x, at N = 16384: 51.54x
+  32 head(s) d =  64 vs fa1     :    2.17x ..    2.88x, at N = 16384: 2.88x
+  32 head(s) d = 128 vs fa1     :    1.73x ..    2.28x, at N = 16384: 2.28x
+  32 head(s) d =  64 vs unfused :    2.54x ..    2.87x, at N = 8192: 2.78x
+  32 head(s) d = 128 vs unfused :    0.76x ..    0.96x, at N = 8192: 0.96x
+  32 head(s) d =  64 vs cpu     :   79.81x ..   92.84x, at N = 8192: 92.84x
+  32 head(s) d = 128 vs cpu     :   32.60x ..   42.24x, at N = 8192: 42.24x
 
 Memory beyond the inputs [MiB]: measured vs model
-   1 head(s) d =  64 fa       N = 16384:       4.1 MiB
+   1 head(s) d =  64 fa       N = 16384:       4.0 MiB
+   1 head(s) d =  64 fa1      N = 16384:       4.1 MiB
    1 head(s) d =  64 unfused  N = 16384:    2048.0 MiB
-   1 head(s) d = 128 fa       N = 16384:       8.1 MiB
+   1 head(s) d = 128 fa       N = 16384:       8.0 MiB
+   1 head(s) d = 128 fa1      N = 16384:       8.1 MiB
    1 head(s) d = 128 unfused  N = 16384:    2048.0 MiB
-  32 head(s) d =  64 fa       N = 16384:     132.0 MiB
+  32 head(s) d =  64 fa       N = 16384:     128.0 MiB
+  32 head(s) d =  64 fa1      N = 16384:     132.0 MiB
   32 head(s) d =  64 unfused  N =  8192:   16384.0 MiB
-  32 head(s) d = 128 fa       N = 16384:     260.0 MiB
+  32 head(s) d = 128 fa       N = 16384:     256.0 MiB
+  32 head(s) d = 128 fa1      N = 16384:     260.0 MiB
   32 head(s) d = 128 unfused  N =  8192:   16384.0 MiB
 
-DRAM traffic: measured / model (FA model uses bc = 64, L2 = 96 MB)
-   1 head(s) d =  64 fa       N = 1024..16384: 1.91 1.43 1.43 1.31 1.37
+DRAM traffic: measured / model (FA1-order model uses bc = 64, L2 = 96 MB)
+   1 head(s) d =  64 fa       N = 1024..16384: 0.95 0.95 0.95 0.95 0.89
+   1 head(s) d =  64 fa1      N = 1024..16384: 1.91 1.43 1.43 1.31 1.37
    1 head(s) d =  64 unfused  N = 1024..16384: 0.65 0.60 0.69 1.04 1.15
-   1 head(s) d = 128 fa       N = 1024..16384: 1.43 1.43 1.43 1.37 1.37
+   1 head(s) d = 128 fa       N = 1024..16384: 0.95 0.95 0.95 0.89 0.92
+   1 head(s) d = 128 fa1      N = 1024..16384: 1.43 1.43 1.43 1.37 1.37
    1 head(s) d = 128 unfused  N = 1024..16384: 0.66 0.60 0.71 1.05 1.15
-  32 head(s) d =  64 fa       N = 1024..16384: 1.37 1.37 1.44 1.32 1.35
+  32 head(s) d =  64 fa       N = 1024..16384: 0.86 0.88 0.98 1.10 1.15
+  32 head(s) d =  64 fa1      N = 1024..16384: 1.37 1.37 1.44 1.32 1.35
   32 head(s) d =  64 unfused  N = 1024..8192: 0.90 1.11 1.14 1.15
-  32 head(s) d = 128 fa       N = 1024..16384: 1.37 1.73 1.17 1.22 1.23
+  32 head(s) d = 128 fa       N = 1024..16384: 0.91 1.01 1.12 1.18 1.20
+  32 head(s) d = 128 fa1      N = 1024..16384: 1.37 1.73 1.17 1.22 1.23
   32 head(s) d = 128 unfused  N = 1024..8192: 0.91 1.12 1.14 1.15
 
 Roofline: ridge points fp32 106 flop/B, fp16 tensor 419 flop/B
   (AI = 4·B·nh·N²·d / measured DRAM bytes; % of the attainable roof of that implementation)
-  model AI: FA bc/3 = 21.3 flop/B, unfused d/6 = 10.7 (d = 64), 21.3 (d = 128) flop/B
-  fa       32 head(s) d =  64 N =  8192: AI    16.1 flop/B,   6852.8 GFLOP/s =  49.4 % of roof
-  fa       32 head(s) d =  64 N = 16384: AI    15.7 flop/B,   7153.4 GFLOP/s =  52.6 % of roof
-  fa       32 head(s) d = 128 N =  4096: AI    18.1 flop/B,   5406.9 GFLOP/s =  34.6 % of roof
-  fa       32 head(s) d = 128 N =  8192: AI    17.4 flop/B,   5533.1 GFLOP/s =  36.8 % of roof
-  fa       32 head(s) d = 128 N = 16384: AI    17.4 flop/B,   5616.7 GFLOP/s =  37.4 % of roof
+  model AI: FA N/4 flop/B, FA1 order bc/3 = 21.3 flop/B, unfused d/6 = 10.7 (d = 64), 21.3 (d = 128) flop/B
+  fa        1 head(s) d =  64 N =  1024: AI   268.4 flop/B,   1101.0 GFLOP/s =   0.5 % of roof
+  fa        1 head(s) d =  64 N =  2048: AI   536.9 flop/B,   2302.2 GFLOP/s =   0.6 % of roof
+  fa        1 head(s) d =  64 N =  4096: AI  1073.7 flop/B,   4688.4 GFLOP/s =   1.3 % of roof
+  fa        1 head(s) d =  64 N =  8192: AI  2147.5 flop/B,   9492.1 GFLOP/s =   2.6 % of roof
+  fa        1 head(s) d =  64 N = 16384: AI  4581.3 flop/B,  19053.4 GFLOP/s =   5.3 % of roof
+  fa        1 head(s) d = 128 N =  1024: AI   268.4 flop/B,   1368.6 GFLOP/s =   0.6 % of roof
+  fa        1 head(s) d = 128 N =  2048: AI   536.9 flop/B,   2869.6 GFLOP/s =   0.8 % of roof
+  fa        1 head(s) d = 128 N =  4096: AI  1073.7 flop/B,   5818.0 GFLOP/s =   1.6 % of roof
+  fa        1 head(s) d = 128 N =  8192: AI  2290.6 flop/B,  11761.1 GFLOP/s =   3.2 % of roof
+  fa        1 head(s) d = 128 N = 16384: AI  4433.5 flop/B,  12006.8 GFLOP/s =   3.3 % of roof
+  fa       32 head(s) d =  64 N =  1024: AI   296.2 flop/B,  17757.8 GFLOP/s =   6.9 % of roof
+  fa       32 head(s) d =  64 N =  2048: AI   582.4 flop/B,  18733.5 GFLOP/s =   5.2 % of roof
+  fa       32 head(s) d =  64 N =  4096: AI  1041.2 flop/B,  17343.0 GFLOP/s =   4.8 % of roof
+  fa       32 head(s) d =  64 N =  8192: AI  1869.9 flop/B,  19475.3 GFLOP/s =   5.4 % of roof
+  fa       32 head(s) d =  64 N = 16384: AI  3558.3 flop/B,  20636.9 GFLOP/s =   5.7 % of roof
+  fa       32 head(s) d = 128 N =  1024: AI   281.6 flop/B,  11368.5 GFLOP/s =   4.7 % of roof
+  fa       32 head(s) d = 128 N =  2048: AI   505.3 flop/B,   9338.1 GFLOP/s =   2.6 % of roof
+  fa       32 head(s) d = 128 N =  4096: AI   913.2 flop/B,  11263.7 GFLOP/s =   3.1 % of roof
+  fa       32 head(s) d = 128 N =  8192: AI  1742.5 flop/B,  12489.0 GFLOP/s =   3.5 % of roof
+  fa       32 head(s) d = 128 N = 16384: AI  3406.7 flop/B,  12806.7 GFLOP/s =   3.5 % of roof
+  fa1      32 head(s) d =  64 N =  8192: AI    16.1 flop/B,   6852.8 GFLOP/s =  49.4 % of roof
+  fa1      32 head(s) d =  64 N = 16384: AI    15.7 flop/B,   7153.4 GFLOP/s =  52.6 % of roof
+  fa1      32 head(s) d = 128 N =  4096: AI    18.1 flop/B,   5406.9 GFLOP/s =  34.6 % of roof
+  fa1      32 head(s) d = 128 N =  8192: AI    17.4 flop/B,   5533.1 GFLOP/s =  36.8 % of roof
+  fa1      32 head(s) d = 128 N = 16384: AI    17.4 flop/B,   5616.7 GFLOP/s =  37.4 % of roof
   unfused   1 head(s) d =  64 N =  8192: AI    10.2 flop/B,   6727.8 GFLOP/s =  76.6 % of roof
   unfused   1 head(s) d =  64 N = 16384: AI     9.3 flop/B,   6932.8 GFLOP/s =  86.5 % of roof
   unfused   1 head(s) d = 128 N =  8192: AI    20.1 flop/B,  12550.7 GFLOP/s =  72.3 % of roof
