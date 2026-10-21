@@ -1,0 +1,95 @@
+\relax 
+\providecommand\babel@aux[2]{}
+\@nameuse{bbl@beforestart}
+\babel@aux{english}{}
+\citation{dao2022flashattention}
+\citation{dao2024flashattention2}
+\citation{dao2022flashattention}
+\citation{dao2024flashattention2}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Background}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Method}{1}{}\protected@file@percent }
+\citation{kim2024flashattentionminimal}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces FlashAttention forward pass (FA2 loop order)}}{2}{}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{alg:fa}{{1}{2}{}{}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}{\ignorespaces Loading $K_j$ and $V_j$ into shared memory.}}{2}{}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}{\ignorespaces Compute this warp's rows of $S_{ij} = Q_i*K_j^T$ on tensor cores}}{3}{}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}{\ignorespaces Compute P (as half for the next MMA) and update the running sum}}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Results}{4}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Time per forward pass versus the sequence length $N$ for a single head (left) and 32 heads (right), with $d = 64$ (solid) and $d = 128$ (dashed), for the FA kernel and unfused libtorch on the L40s and on 8 CPU cores.}}{5}{}\protected@file@percent }
+\newlabel{Time}{{1}{5}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Effective floating point throughput ($4N^2d$ flops per head) versus $N$ for every implementation and head dimension, with the L40s fp32 and fp16 tensor-core peaks (dashed).}}{5}{}\protected@file@percent }
+\newlabel{GFlops}{{2}{5}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Speedup of the FA kernel over unfused libtorch on the GPU and on the CPU versus $N$; values above 1 mean the FA kernel is faster.}}{6}{}\protected@file@percent }
+\newlabel{Speedup}{{3}{6}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Memory allocated beyond $Q$, $K$ and $V$ versus $N$ (CPU: whole-process peak RSS), with the models $2Bn_hN^2\cdot 4$\,B for unfused and $Bn_hNd\cdot 4$\,B for the FA kernel (dotted) and the usable L40s memory (dashed).}}{6}{}\protected@file@percent }
+\newlabel{Memory}{{4}{6}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces DRAM traffic per forward pass measured with Nsight Compute versus $N$, with the traffic models (dotted).}}{7}{}\protected@file@percent }
+\newlabel{Traffic}{{5}{7}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Achieved DRAM bandwidth versus $N$ for the GPU implementations, with the L40s DRAM peak of 864\,GB/s (dashed).}}{7}{}\protected@file@percent }
+\newlabel{Bandwidth}{{6}{7}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Roofline model of the L40s with the fp32 and fp16 tensor-core ceilings and every GPU measurement; hollow markers are runs whose working set fits in L2, which inflates their arithmetic intensity.}}{8}{}\protected@file@percent }
+\newlabel{Roofline}{{7}{8}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Discussion}{8}{}\protected@file@percent }
+\citation{shah2024flashattention3}
+\citation{zadouri2026flashattention4}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Conclusion}{9}{}\protected@file@percent }
+\bibstyle{unsrt}
+\bibdata{references}
+\bibcite{dao2022flashattention}{1}
+\bibcite{dao2024flashattention2}{2}
+\bibcite{kim2024flashattentionminimal}{3}
+\bibcite{shah2024flashattention3}{4}
+\bibcite{zadouri2026flashattention4}{5}
+\@writefile{toc}{\contentsline {section}{\numberline {6}AI Declaration}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A}Measurement tables}{11}{}\protected@file@percent }
+\newlabel{app:tables}{{A}{11}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Correctness}{11}{}\protected@file@percent }
+\gdef \LT@i {\LT@entry 
+    {1}{13.08682pt}\LT@entry 
+    {1}{16.18411pt}\LT@entry 
+    {4}{26.6671pt}\LT@entry 
+    {4}{20.00006pt}\LT@entry 
+    {1}{69.91531pt}\LT@entry 
+    {4}{29.5834pt}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Correctness of the FA kernel against unfused libtorch on the GPU.}}{12}{}\protected@file@percent }
+\newlabel{tab:test}{{1}{12}{}{}{}}
+\gdef \LT@ii {\LT@entry 
+    {1}{36.49306pt}\LT@entry 
+    {4}{31.66711pt}\LT@entry 
+    {4}{20.00006pt}\LT@entry 
+    {4}{20.00006pt}\LT@entry 
+    {4}{37.7779pt}\LT@entry 
+    {1}{49.1529pt}\LT@entry 
+    {1}{57.91681pt}\LT@entry 
+    {1}{60.48622pt}\LT@entry 
+    {1}{28.87506pt}\LT@entry 
+    {1}{40.27786pt}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}FA kernel, GPU (fp16 tensor cores)}{14}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces FA kernel, GPU (fp16 tensor cores), NVIDIA L40s. Mem.: memory beyond the inputs; DRAM and GB/s: traffic and achieved bandwidth from Nsight Compute; occ.: achieved occupancy.}}{14}{}\protected@file@percent }
+\newlabel{tab:fa}{{2}{14}{}{}{}}
+\gdef \LT@iii {\LT@entry 
+    {1}{36.49306pt}\LT@entry 
+    {4}{31.66711pt}\LT@entry 
+    {4}{20.00006pt}\LT@entry 
+    {4}{20.00006pt}\LT@entry 
+    {4}{32.77788pt}\LT@entry 
+    {1}{49.1529pt}\LT@entry 
+    {1}{57.91681pt}\LT@entry 
+    {1}{60.48622pt}\LT@entry 
+    {1}{28.87506pt}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.3}Unfused libtorch, GPU (fp32)}{15}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Unfused libtorch, GPU (fp32), NVIDIA L40s. Mem.: memory beyond the inputs; DRAM and GB/s: traffic and achieved bandwidth from Nsight Compute.}}{15}{}\protected@file@percent }
+\newlabel{tab:unfused}{{3}{15}{}{}{}}
+\gdef \LT@iv {\LT@entry 
+    {1}{36.49306pt}\LT@entry 
+    {4}{31.66711pt}\LT@entry 
+    {4}{20.00006pt}\LT@entry 
+    {4}{20.00006pt}\LT@entry 
+    {4}{44.44493pt}\LT@entry 
+    {1}{49.1529pt}\LT@entry 
+    {4}{76.87474pt}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.4}Unfused libtorch, CPU (8 cores)}{16}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Unfused libtorch, CPU (8 cores).}}{16}{}\protected@file@percent }
+\newlabel{tab:cpu}{{4}{16}{}{}{}}
+\gdef \@abspage@last{17}

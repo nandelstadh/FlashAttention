@@ -3,7 +3,7 @@
 
   time.png          time per forward pass vs N (CPU vs GPU, scaling)
   gflops.png        effective FLOP rate vs N, with the L40s peaks
-  speedup.png       FA kernel relative to the FA1-order kernel, unfused GPU and the CPU
+  speedup.png       FA kernel relative to unfused GPU and the CPU
   memory.png        extra memory vs N with the O(N^2) and O(Nd) models
   dram_traffic.png  measured DRAM traffic vs N with traffic models and the L2 limit
   bandwidth.png     achieved DRAM bandwidth vs N
@@ -12,9 +12,7 @@
 All csv files per implementation are read and, per configuration, the fastest
 run is kept (best of runs removes interference from other jobs on the node);
 single runs are drawn as faint markers when there are several. Implementations
-without csv files are left out; fa1_*.csv holds the earlier kernel with the
-FlashAttention-1 loop order (O, l, m in global memory). Colour and
-marker identify the implementation (same in every figure), line style the head
+without csv files are left out. Colour and marker identify the implementation (same in every figure), line style the head
 dimension. The numbers quoted in the report go to figures/summary.txt.
 """
 import csv
@@ -39,26 +37,22 @@ L2 = 96e6                   # bytes
 GPU_MEM = 44.47 * 2**30     # bytes
 PEAK_FP32 = 91.6e3          # GFLOP/s
 PEAK_FP16 = 362e3           # GFLOP/s
-BC = 64                     # K/V tile rows of the FA1-order kernel on the L40s (d = 64 and 128)
 FLOAT = 4
 MIB = 2**20
 
-IMPLS = ("fa", "unfused", "cpu", "fa1")
+IMPLS = ("fa", "unfused", "cpu")
 LABEL = {"fa": "FA kernel, GPU (fp16 tensor cores)",
          "unfused": "unfused libtorch, GPU (fp32)",
-         "cpu": "unfused libtorch, CPU (8 cores)",
-         "fa1": "FA kernel, FA1 loop order (O in global memory)"}
-# categorical slots 1-4 of the validated reference palette, in fixed order (as in Lab3)
-COLOR = {"fa": "#2a78d6", "unfused": "#eb6834", "cpu": "#1baf7a", "fa1": "#eda100"}
-MARKER = {"fa": "o", "unfused": "s", "cpu": "^", "fa1": "D"}
-FA_KERNELS = ("fa", "fa1")
+         "cpu": "unfused libtorch, CPU (8 cores)"}
+# categorical slots 1-3 of the validated reference palette, in fixed order (as in Lab3)
+COLOR = {"fa": "#2a78d6", "unfused": "#eb6834", "cpu": "#1baf7a"}
+MARKER = {"fa": "o", "unfused": "s", "cpu": "^"}
 D_LS = {64: "-", 128: "--"}
 HEADS = ((1, 1), (4, 8))
 HEADS_TITLE = {(1, 1): "single head (B = 1, nh = 1)", (4, 8): "32 heads (B = 4, nh = 8)"}
 FIGSIZE = (14, 5.5)
 REF_STYLE = dict(color="0.4", ls="--", lw=1.1, zorder=0)
 MODEL_STYLE = dict(color="0.45", ls=":", lw=1.4, zorder=1)
-MARK_STYLE = dict(color="0.55", ls=":", lw=1.0, zorder=0)
 
 SUMMARY = []
 NFILES = {}   # number of csv files (runs) per implementation
@@ -225,8 +219,8 @@ def plot_gflops(best, runs):
 
 
 def plot_speedup(best):
-    base = present(best, FA_KERNELS)[0]
-    others = [o for o in present(best, ("fa1", "unfused", "cpu")) if o != base]
+    base = "fa"
+    others = present(best, ("unfused", "cpu"))
     fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, sharey=True)
     note()
     note(f"Speedup of {LABEL[base]} (time of other / time of FA)")
@@ -267,11 +261,11 @@ def plot_memory(best, runs):
                     xytext=(10, -4), textcoords="offset points", fontsize=8, color="0.35", va="top")
         for d in (64, 128):
             ax.plot(ns, [h * n * d * FLOAT / MIB for n in ns], **MODEL_STYLE)
-        ax.annotate("B·nh·N·d·4 B (O; FA1 order also l, m)", xy=(ns[2], h * ns[2] * 64 * FLOAT / MIB),
+        ax.annotate("B·nh·N·d·4 B (O)", xy=(ns[2], h * ns[2] * 64 * FLOAT / MIB),
                     xytext=(0, -14), textcoords="offset points", fontsize=8, color="0.35", va="top")
         ref_line(ax, GPU_MEM / MIB, "L40s memory (44.5 GiB usable)")
         for d in (64, 128):
-            for impl in present(best, ("fa", "fa1", "unfused")):
+            for impl in present(best, ("fa", "unfused")):
                 ok, _ = configs(best, impl, heads, d)
                 n, row = ok[-1]
                 note(f"  {h:2d} head(s) d = {d:3d} {impl:8s} N = {n:5d}: {row['extra_mib']:9.1f} MiB")
@@ -288,17 +282,7 @@ def fa_traffic_model(heads, n, d):
     return heads[0] * heads[1] * 4 * n * d * FLOAT
 
 
-def fa1_traffic_model(heads, n, d):
-    """Bytes: compulsory while Q and O (re-touched for every K/V tile) fit in L2,
-    otherwise the FA1 loop order reads Q and reads + writes O once per K/V tile."""
-    h = heads[0] * heads[1]
-    tile = n * d * FLOAT                    # one N x d matrix of one head
-    if 2 * h * tile <= L2:
-        return h * 4 * tile                 # read Q, K, V, write O
-    return h * ((n / BC) * 3 * tile + 2 * tile)
-
-
-TRAFFIC_MODEL = {"fa": fa_traffic_model, "fa1": fa1_traffic_model}
+TRAFFIC_MODEL = {"fa": fa_traffic_model}
 
 
 def unfused_traffic_model(heads, n, d):
@@ -310,8 +294,8 @@ def unfused_traffic_model(heads, n, d):
 def plot_traffic(best, runs):
     fig, axes = plt.subplots(1, 2, figsize=FIGSIZE)
     note()
-    note(f"DRAM traffic: measured / model (FA1-order model uses bc = {BC}, L2 = {L2 / 1e6:.0f} MB)")
-    gpu = present(best, ("fa", "fa1", "unfused"))
+    note("DRAM traffic: measured / model")
+    gpu = present(best, ("fa", "unfused"))
     dense = [int(1024 * 2 ** (i / 16)) for i in range(65)]
     for ax, heads in zip(axes, HEADS):
         h = heads[0] * heads[1]
@@ -321,37 +305,29 @@ def plot_traffic(best, runs):
         ax.annotate("6 passes over S", xy=(2048, unfused_traffic_model(heads, 2048, 64) / 1e9),
                     xytext=(0, 10), textcoords="offset points", fontsize=8, color="0.35", ha="right")
         for d in (64, 128):
-            for impl in present(best, FA_KERNELS):
-                ax.plot(dense, [TRAFFIC_MODEL[impl](heads, n, d) / 1e9 for n in dense], **MODEL_STYLE)
-            n_l2 = L2 / (2 * h * d * FLOAT)
-            if "fa1" in best and dense[0] <= n_l2 <= dense[-1]:
-                ax.axvline(n_l2, **MARK_STYLE)
-                ax.annotate(f"FA1 order: Q + O = L2, d = {d}", xy=(n_l2, 0.03),
-                            xycoords=("data", "axes fraction"), rotation=90, fontsize=8, color="0.35",
-                            ha="right", va="bottom")
+            if "fa" in best:
+                ax.plot(dense, [fa_traffic_model(heads, n, d) / 1e9 for n in dense], **MODEL_STYLE)
             for impl in gpu:
                 model = TRAFFIC_MODEL.get(impl, unfused_traffic_model)
                 ok, _ = configs(best, impl, heads, d)
                 ratios = " ".join(f"{row['dram_gb'] * 1e9 / model(heads, n, d):4.2f}" for n, row in ok)
                 note(f"  {h:2d} head(s) d = {d:3d} {impl:8s} N = {ok[0][0]}..{ok[-1][0]}: {ratios}")
-        ax.annotate("FA model: compulsory (Q, K, V, O once)\nFA1-order model: compulsory while Q + O\n"
-                    "fit in L2, then Q + O read/write per K/V tile",
+        ax.annotate("FA model: compulsory (Q, K, V, O once)",
                     xy=(0.02, 0.97), xycoords="axes fraction", fontsize=8, color="0.35", va="top")
         log_axes(ax, HEADS_TITLE[heads], "DRAM traffic per forward pass [GB] (ncu)", subs=(1.0,))
     legend(fig, gpu, model="traffic models")
-    fig.suptitle("DRAM traffic: Θ(N²) for unfused, Θ(N·d) for the FA kernel, Θ(N²·d/bc) in FA1 order",
-                 fontsize=12)
+    fig.suptitle("DRAM traffic: Θ(N²) for unfused, Θ(N·d) for the FA kernel", fontsize=12)
     save(fig, "dram_traffic.png")
 
 
 def plot_bandwidth(best, runs):
     fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, sharey=True)
     for ax, heads in zip(axes, HEADS):
-        for impl in present(best, ("fa", "fa1", "unfused")):
+        for impl in present(best, ("fa", "unfused")):
             plot_impl(ax, best, runs, impl, heads, lambda r, *_: r["dram_gbps"])
         ref_line(ax, BW, "L40s DRAM peak (864 GB/s)")
         log_axes(ax, HEADS_TITLE[heads], "achieved DRAM bandwidth [GB/s] (ncu)", subs=(1.0, 3.0))
-    legend(fig, present(best, ("fa", "fa1", "unfused")))
+    legend(fig, present(best, ("fa", "unfused")))
     fig.suptitle("Achieved DRAM bandwidth", fontsize=12)
     save(fig, "bandwidth.png")
 
@@ -362,8 +338,6 @@ def l2_resident(impl, heads, n, d):
     h = heads[0] * heads[1]
     if impl == "fa":
         return False
-    if impl == "fa1":
-        return 2 * h * n * d * FLOAT <= L2
     return h * n * n * FLOAT <= L2
 
 
@@ -379,12 +353,11 @@ def plot_roofline(best):
     note()
     note(f"Roofline: ridge points fp32 {PEAK_FP32 / BW:.0f} flop/B, fp16 tensor {PEAK_FP16 / BW:.0f} flop/B")
     note("  (AI = 4·B·nh·N²·d / measured DRAM bytes; % of the attainable roof of that implementation)")
-    # From the traffic models: FA moves 4·N·d·4 B for 4·N²·d flop -> N/4; the FA1 order moves
-    # 3·N·d·4 B per K/V tile for 4·N·bc·d flop -> bc/3; unfused moves 6·N²·4 B -> d/6
-    note(f"  model AI: FA N/4 flop/B, FA1 order bc/3 = {BC / 3:.1f} flop/B, unfused d/6 = "
+    # From the traffic models: FA moves 4·N·d·4 B for 4·N²·d flop -> N/4; unfused moves 6·N²·4 B -> d/6
+    note(f"  model AI: FA N/4 flop/B, unfused d/6 = "
          f"{64 / 6:.1f} (d = 64), {128 / 6:.1f} (d = 128) flop/B")
-    peaks = {"fa": PEAK_FP16, "fa1": PEAK_FP16, "unfused": PEAK_FP32}
-    for impl in present(best, ("fa", "fa1", "unfused")):
+    peaks = {"fa": PEAK_FP16, "unfused": PEAK_FP32}
+    for impl in present(best, ("fa", "unfused")):
         peak = peaks[impl]
         for resident in (False, True):
             xs, ys = [], []
@@ -406,7 +379,7 @@ def plot_roofline(best):
             ax.plot(xs, ys, ls="none", marker=MARKER[impl], ms=8, color=COLOR[impl],
                     mfc="none" if resident else COLOR[impl], mew=1.6, zorder=3,
                     label=f"{LABEL[impl]}, " + ("only compulsory traffic" if impl == "fa"
-                                                else "working set in L2 (AI inflated)" if resident
+                                                else "working set in L2" if resident
                                                 else "working set larger than L2"))
     ax.set_xscale("log")
     ax.set_yscale("log")

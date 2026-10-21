@@ -1,0 +1,29 @@
+\begin{thebibliography}{1}
+
+\bibitem{dao2022flashattention}
+Tri Dao, Daniel~Y. Fu, Stefano Ermon, Atri Rudra, and Christopher R{\'e}.
+\newblock {FlashAttention}: Fast and memory-efficient exact attention with {IO}-awareness.
+\newblock In {\em Advances in Neural Information Processing Systems}, volume~35, pages 16344--16359, 2022.
+
+\bibitem{dao2024flashattention2}
+Tri Dao.
+\newblock {FlashAttention-2}: Faster attention with better parallelism and work partitioning.
+\newblock In {\em International Conference on Learning Representations}, 2024.
+
+\bibitem{kim2024flashattentionminimal}
+Peter Kim.
+\newblock flash-attention-minimal.
+\newblock \url{https://github.com/tspeterkim/flash-attention-minimal}, 2024.
+\newblock GitHub repository.
+
+\bibitem{shah2024flashattention3}
+Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, and Tri Dao.
+\newblock {FlashAttention-3}: Fast and accurate attention with asynchrony and low-precision.
+\newblock In {\em Advances in Neural Information Processing Systems}, volume~37, pages 68658--68685, 2024.
+
+\bibitem{zadouri2026flashattention4}
+Ted Zadouri, Markus Hoehnerbach, Jay Shah, Vijay Thakkar, and Tri Dao.
+\newblock {FlashAttention-4}: Algorithm and kernel pipelining co-design for asymmetric hardware scaling.
+\newblock In {\em Proceedings of Machine Learning and Systems}, volume~8, pages 912--926, 2026.
+
+\end{thebibliography}

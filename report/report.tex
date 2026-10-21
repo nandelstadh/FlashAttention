@@ -1,0 +1,297 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Uppsala University Assignment Title Page 
+% LaTeX Template
+% Version 1.0 (27/12/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Original author:
+% WikiBooks (http://en.wikibooks.org/wiki/LaTeX/Title_Creation)
+% Modified by Elsa Slattegard to fit Uppsala university
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+
+%\title{Title page with logo}
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[12pt]{article}
+\usepackage{longtable}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{multirow} % needed for tables
+\usepackage{listings} % needed for code inclusion
+\setlength {\marginparwidth}{2cm}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float}
+
+ % this chunk defines the colors for code inclusion
+\lstset{
+    language=C,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    commentstyle=\color{purple},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    breaklines=true,
+    frame=single,
+    tabsize=4
+}
+
+
+\begin{document}
+
+\begin{titlepage}
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}} % Defines a new command for the horizontal lines, change thickness here
+
+\center % Center everything on the page
+ 
+%----------------------------------------------------------------------------------------
+%	HEADING SECTIONS
+%----------------------------------------------------------------------------------------
+
+\textsc{\LARGE Uppsala University}\\[1.5cm] % Name of your university/college
+\includegraphics[scale=.1]{Uppsala_University_seal_svg.png}\\[1cm] % Include a department/university logo - this will require the graphicx package
+\textsc{\Large Accelerator-Based Programming}\\[0.5cm] % Major heading such as course name
+\textsc{\large 1TD054}\\[0.5cm] % Minor heading such as course title
+
+%----------------------------------------------------------------------------------------
+%	TITLE SECTION
+%----------------------------------------------------------------------------------------
+
+\HRule \\[0.4cm]
+{ \huge \bfseries Flash Attention Forward Pass}\\[0.4cm] % Title of your document
+\HRule \\[1.5cm]
+ 
+%----------------------------------------------------------------------------------------
+%	AUTHOR SECTION
+%----------------------------------------------------------------------------------------
+
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft} \large
+\emph{Authors:}\\
+Anton \textsc{von Nandelstadh}\\% Your name
+\end{flushleft}
+
+\end{minipage}\\[2cm]
+
+% If you don't want a supervisor, uncomment the two lines below and remove the section above
+%\Large \emph{Author:}\\
+%John \textsc{Smith}\\[3cm] % Your name
+
+%----------------------------------------------------------------------------------------
+%	DATE SECTION
+%----------------------------------------------------------------------------------------
+
+{\large Targeted grade: 5}\\[1cm]
+
+{\large \today}\\[2cm] % Date, change the \today to a set date if you want to be precise
+
+\vfill % Fill the rest of the page with whitespace
+
+\end{titlepage}
+
+\section{Background}
+Multi-head attention is one of the core algorithms in the transformer model used in most modern large language models. Attention computes $O =$ softmax$(QK^T / \sqrt{d}) V$, where $Q, K$ and $V$ are $N \times d$ matrices ($N$ is the sequence length, $d$ the head dimension). The standard implementation writes the $N \times N$ score matrix $S = QK^T$ to global memory, applies a row-wise softmax and multiplies by $V$. This needs $O(N^2)$ extra memory, and the work is dominated by moving $S$ in and out of global memory. FlashAttention (FA)~\cite{dao2022flashattention} processes $Q, K$ and $V$ in tiles held in shared memory and uses an online softmax. These are dense matrices, produced by multiplying the input sequence with learned dense matrix weights. For each query row it keeps a running maximum and a running sum, and rescales the partial output whenever a new $K/V$ tile changes the maximum. $S$ is never written to global memory, so the memory footprint stays $O(Nd)$. FlashAttention2~\cite{dao2024flashattention2} improved upon this, by changing the loop order, freeing up some shared memory and thus allowing for higher arithmetic intensity.
+
+
+
+\section{Method}
+
+
+The forward pass implemented in \texttt{flash\_attention.cu} is given in Algorithm~\ref{alg:fa}. It follows the notation of Algorithm~1 of~\cite{dao2022flashattention}, but with the loop order of FlashAttention2~\cite{dao2024flashattention2}: each thread block owns one $Q_i$ and loops over all $K_j, V_j$, so $m_i$, $\ell_i$ and $O_i$ never leave the chip and the normalisation by $\ell_i$ is applied once at the end. Both matrix products run on tensor cores with FP16 inputs and FP32 accumulation. $B_r$ and $B_c$ are chosen to maximise the resident warps per SM within the shared memory, and the zero-padded tail of the last $K_j$ is masked to $-\infty$ in $S_{ij}$.
+
+\begin{algorithm}[H]
+\caption{FlashAttention forward pass (FA2 loop order)}
+\label{alg:fa}
+\begin{algorithmic}[1]
+\Require Matrices $Q, K, V \in \mathbb{R}^{N \times d}$ in HBM, on-chip SRAM of size $M$, $\tau = 1/\sqrt{d}$.
+\State Set block sizes $B_r, B_c$ for maximum occupancy within $M$.
+\State Divide $Q$ into $T_r = \lceil N/B_r \rceil$ blocks $Q_1, \dots, Q_{T_r}$ of size $B_r \times d$ each, and divide $K, V$ into $T_c = \lceil N/B_c \rceil$ blocks $K_1, \dots, K_{T_c}$ and $V_1, \dots, V_{T_c}$ of size $B_c \times d$ each.
+\State Divide $O$ into $T_r$ blocks $O_1, \dots, O_{T_r}$ of size $B_r \times d$ each.
+\For{$1 \le i \le T_r$ \textbf{in parallel}}
+    \State Load $Q_i$ from HBM to on-chip SRAM.
+    \State On chip, initialize $O_i = (0)_{B_r \times d}$, $\ell_i = (0)_{B_r}$, $m_i = (-\infty)_{B_r}$.
+    \For{$1 \le j \le T_c$}
+        \State Load $K_j, V_j$ from HBM to on-chip SRAM.
+        \State On chip, compute $S_{ij} = \tau Q_i K_j^T$, $m_i^{\text{new}} = \max(m_i, \operatorname{rowmax}(S_{ij}))$.
+        \State On chip, compute $\tilde{P}_{ij} = \exp(S_{ij} - m_i^{\text{new}})$, $\ell_i \gets e^{m_i - m_i^{\text{new}}} \ell_i + \operatorname{rowsum}(\tilde{P}_{ij})$.
+        \State On chip, compute $O_i \gets \operatorname{diag}(e^{m_i - m_i^{\text{new}}}) O_i + \tilde{P}_{ij} V_j$, $m_i \gets m_i^{\text{new}}$.
+    \EndFor
+    \State On chip, compute $O_i \gets \operatorname{diag}(\ell_i)^{-1} O_i$.
+    \State Write $O_i$ to HBM.
+\EndFor
+\State \Return $O$.
+\end{algorithmic}
+\end{algorithm}
+
+The scaffolding for the CUDA kernel is based on the flash-attention-minimal implementation of FA1~\cite{kim2024flashattentionminimal}, but the kernel itself is completely different. We highlight some key features of the code here. Below, we see how the $K_j$ and $V_j$ tiles are loaded into SRAM at each of the $T_c$ iterations of the inner for loop.
+
+
+\begin{lstlisting}[language=C, caption={Loading $K_j$ and $V_j$ into shared memory.}]
+for (int e = tx; e < KV_tile_size; e += blockDim.x){
+	int KV_row = j*bc + e/d;
+	bool in_bounds = KV_row < N;
+	K_j[e] = __float2half(in_bounds ? K[matrix_offset + (KV_tile_size*j) + e]: 0.0f);
+	V_j[e] = __float2half(in_bounds ? V[matrix_offset + (KV_tile_size*j) + e]: 0.0f);
+}
+__syncthreads();
+
+int KV_valid = min(bc, N - j*bc);
+\end{lstlisting}
+
+Perhaps the main computation is that of $S_{ij}$. In order to speed up this computation, we use wmma to move it onto the tensor cores, which are optimised for matrix multiplication. This is seen below. The computation of $O_i$ is very similar and hence omitted.
+
+\begin{lstlisting}[language=C, caption={Compute this warp's rows of $S_{ij} = Q_i*K_j^T$ on tensor cores
+}]
+for (int n = 0; n < bc; n += WN){
+	wmma::fragment<wmma::accumulator, WM, WN, WK, float> acc;
+	wmma::fill_fragment(acc, 0.0f);
+	for (int k = 0; k < d; k += WK){
+		wmma::fragment<wmma::matrix_a, WM, WN, WK, __half, wmma::col_major> Q_frag;
+		wmma::fragment<wmma::matrix_b, WM, WN, WK, __half, wmma::col_major> K_frag;
+		wmma::load_matrix_sync(Q_frag, &Q_i[k*br + r0], br);
+		wmma::load_matrix_sync(K_frag, &K_j[n*d + k], d);
+		wmma::mma_sync(acc, Q_frag, K_frag, acc);
+	}
+	wmma::store_matrix_sync(&S_ij[n*br + r0], acc, br, wmma::mem_col_major);
+}
+__syncwarp();
+
+\end{lstlisting}
+
+One of the key ideas of the original flash attention algorithms is to keep track of $\ell$ and $m$ in order so that we can parallelise the softmax. The computation of $P_{ij}$ using these principles is shown below.
+
+\begin{lstlisting}[language=C, caption={Compute P (as half for the next MMA) and update the running sum
+}]
+float row_sum = 0.0f;
+for (int y = y0; y < y1; y++){
+	float p = __expf(S_ij[(y*br) + row] - row_max_new);
+	P_ij[(y*br) + row] = __float2half(p);
+	row_sum += p;
+}
+row_sum += __shfl_xor_sync(FULL_MASK, row_sum, 16);
+float alpha = __expf(row_max - row_max_new); // Rescales everything accumulated so far
+row_l = alpha*row_l + row_sum;
+row_max = row_max_new;
+\end{lstlisting}
+
+
+In order to maximise occupancy, which we find to be our main bottleneck, we search the grid $(B_r, B_c)$ with values in $\{64, 128\} \times \{16, 32, 48, 64\}$ for the pair that maximises occupancy. We compute the shared bytes per block and then we query \texttt{cudaOccupancyMaxActiveBlocksPerMultiprocessor} and compare different values in the grid.
+
+We have tried to improve access patterns as much as possible. Optimisations here include coalesced $Q$ and $K/V$ loading, and $O$ storage. This means that each warp instruction moves $128$ contiguous bytes and does not waste bandwidth. We also changed the order of dimensions to grid\_dim$(tr, nh, B)$, so that the $Q$ tiles are in the fastest-varying index x. Moreover, $S_{ij}$, $P_{ij}$ and $O_i$ are all stored in a column-major layout, due to how they are used in the kernel.
+
+\section{Results}
+Fig. \ref{Time} shows us how the time per forward pass grows quadratically with sequence length for the unfused and CPU kernels. However, we also see that the Flash Attention kernel with only one head grows linearly. This is because the GPU has not been saturated yet, but when the GPU is full as in the multi-head case, the growth becomes quadratic. Hence we see that the FA kernel is faster for all but the smallest batches. There is a kink in the unfused GPU kernel for single head runs when $S$ outgrows the L2 cache.
+
+\begin{center}
+\begin{minipage}{\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../figures/time.png}
+\captionof{figure}{Time per forward pass versus the sequence length $N$ for a single head (left) and 32 heads (right), with $d = 64$ (solid) and $d = 128$ (dashed), for the FA kernel and unfused libtorch on the L40s and on 8 CPU cores.}
+\label{Time}
+\end{minipage}
+\end{center}
+
+In Fig. \ref{GFlops} we see the computational throughput for the different kernels. We find that the throughput of the FA kernel is roughly 50\% faster than the unfused kernel, when comparing optimal values of $d$. Both GPU kernels outperform the CPU kernel by several orders of magnitude. Nevertheless, even the FA kernel is very far from achieving optimal FLOPs. 
+
+\begin{center}
+\begin{minipage}{\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../figures/gflops.png}
+\captionof{figure}{Effective floating point throughput ($4N^2d$ flops per head) versus $N$ for every implementation and head dimension, with the L40s fp32 and fp16 tensor-core peaks (dashed).}
+\label{GFlops}
+\end{minipage}
+\end{center}
+
+Fig. \ref{Speedup} shows the speedup of the FA kernel over the other kernels. It tells a similar story of the FA kernel outperforming for large batches. However, comparing $d=128$ embeddings, the fused and unfused kernels perform about the same, but this is because the FA kernel performs better at $d=64$.
+
+\begin{center}
+\begin{minipage}{\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../figures/speedup.png}
+\captionof{figure}{Speedup of the FA kernel over unfused libtorch on the GPU and on the CPU versus $N$; values above 1 mean the FA kernel is faster.}
+\label{Speedup}
+\end{minipage}
+\end{center}
+
+In Fig. \ref{Memory} we see a significant difference between the fused and unfused kernels. The fused kernel's memory usage grows linearly, while the others' grow quadratically. This is because the FA algorithm only stores tiles $S_{ij}$ in memory, and never the whole score matrix. Because of this the unfused kernels fail to complete for the largest batches.
+
+\begin{center}
+\begin{minipage}{\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../figures/memory.png}
+\captionof{figure}{Memory allocated beyond $Q$, $K$ and $V$ versus $N$ (CPU: whole-process peak RSS), with the models $2Bn_hN^2\cdot4$\,B for unfused and $Bn_hNd\cdot4$\,B for the FA kernel (dotted) and the usable L40s memory (dashed).}
+\label{Memory}
+\end{minipage}
+\end{center}
+
+Fig. \ref{Traffic} shows the DRAM traffic per forward pass, taken from Nsight Compute. DRAM traffic for the unfused kernel grows quadratically, while for the fused kernel it grows linearly. This is because the unfused kernel reads $S$ at every pass, whereas the fused kernel reads the matrices only once into SRAM.
+
+\begin{center}
+\begin{minipage}{\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../figures/dram_traffic.png}
+\captionof{figure}{DRAM traffic per forward pass measured with Nsight Compute versus $N$, with the traffic models (dotted).}
+\label{Traffic}
+\end{minipage}
+\end{center}
+
+Fig. \ref{Bandwidth} shows the amount of DRAM bandwidth used for the different GPU kernels. We see that the unfused kernel is clearly bandwidth bound, whereas this ceases to be the case for the fused kernel.
+
+\begin{center}
+\begin{minipage}{\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../figures/bandwidth.png}
+\captionof{figure}{Achieved DRAM bandwidth versus $N$ for the GPU implementations, with the L40s DRAM peak of 864\,GB/s (dashed).}
+\label{Bandwidth}
+\end{minipage}
+\end{center}
+
+Fig. \ref{Roofline} is a roofline model, with the unfused kernel in orange, and the fused kernel in blue. It neatly illustrates how the unfused kernel is memory-bound, while the fused kernel is not.
+
+\begin{center}
+\begin{minipage}{\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../figures/roofline.png}
+\captionof{figure}{Roofline model of the L40s with the fp32 and fp16 tensor-core ceilings and every GPU measurement; hollow markers are runs whose working set fits in L2, which inflates their arithmetic intensity.}
+\label{Roofline}
+\end{minipage}
+\end{center}
+
+\section{Discussion}
+The results above clearly motivate the need for a fused attention kernel. The CPU kernel is incredibly slow compared with even the unfused GPU kernel, as the 8 threads we ran it on cannot match the 18176 cores of the L40 GPU. Nevertheless, the roofline model and bandwidth analysis show that the unfused GPU kernel completely saturates DRAM bandwidth. Hence the fused kernel from the FlashAttention algorithm outperforms the unfused kernel by not constantly loading $S$ into HBM, but rather by working on tiles $S_{ij}$ kept in SRAM. This removes the bandwidth bound, but creates a new bound, which is the size of SRAM. Because only a few blocks saturate SRAM, we cannot use the full FLOP capacity per SM, and hence stay quite far from the theoretical tensor core FLOPs. One way to improve on this is to follow FA2, which keeps e.g. $O_i$ in registers instead of in SRAM. However, we did not implement this as it increases code complexity quite significantly.
+
+Because our new performance bound is SRAM size, the tile sizes we use matter. This is likely why $d=128$ performs worse than $d=64$, since $d=128$ constrains the size of the tiles more. The way we choose tile sizes i.e. $B_r$ and $B_c$ in the algorithm, is by dynamically checking what saturates SRAM. Hence we cannot be sure that the tiles are completely optimal, but we do know that they are optimal within the grid searched.
+
+For access patterns, we implemented multiple optimisations described above. However, this does not seem to be the bottleneck in our case, but rather occupancy as described above is. We get $8$ warps per SM for $d=64$ and $4$ warps per SM for $d=128$, out of a possible $48$.
+
+A Flash Attention implementation on a framework such as Kokkos would inherently suffer from the higher level of abstraction required by such a framework. The way we would map this to Kokkos is by using a league of teams for a grid of blocks, teams for blocks and level-0 team scratch for shared memory. However, there are significant limitations. Access to tensor cores or syncing warps on a low level, does not work well in Kokkos. It is additionally harder to query for specific hardware features, such as SM occupancy. 
+
+\section{Conclusion}
+We managed to get a significant performance improvement using our fused Flash Attention kernel, over the unfused kernel. Both massively outperform the CPU. We found that the bottleneck shifts from memory bandwidth to SRAM, as we fuse the kernel to minimise HBM access. Nevertheless, due to the brevity of this project, there were many optimisations which we did not have time to implement. The main one would be heavier usage of registers, which would decrease the pressure on SRAM. For newer generations of GPUs, there are also many other tricks you can use, detailed in FlashAttention-3~\cite{shah2024flashattention3} and FlashAttention-4~\cite{zadouri2026flashattention4}, designed for H100 and B200 respectively.
+
+\section{AI Declaration}
+Auxiliary code such as the testing harness, scripts, plots and tables were planned and generated with the help of Claude Code and Opus 5.5. The focus of human attention was on writing and understanding the core kernels and writing the report.
+
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\input{appendix_tables}
+\end{document}
+
